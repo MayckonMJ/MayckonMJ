@@ -6,14 +6,14 @@ Me chamo Mayckon Jhonatas, tenho 27 anos e sou natural do Pará e moro no Góias
 
 
 <p align="left">
-   <a href="https://github.com/Larissakich?tab=followers">
+   <a href="https://github.com/MayckonMJ?tab=followers">
         <img 
             alt="Seguidores" 
             title="Me siga no GitHub" 
             src="https://custom-icon-badges.demolab.com/github/followers/Larissakich?color=236ad3&labelColor=1155ba&style=for-the-badge&logo=github&label=Seguidores&logoColor=white"
         />
     </a>
-    <a href="https://github.com/Larissakich?tab=repositories&sort=stargazers">
+    <a href="https://github.com/MayckonMJ?tab=repositories&sort=stargazers">
         <img 
             alt="Total de estrelas" 
             title="Total de estrelas GitHub" 
