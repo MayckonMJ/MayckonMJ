@@ -54,10 +54,15 @@
         /* BOTÃO DARK MODE */
         .btn-theme { background: var(--warning); border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; }
 
-        .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 500px; margin: 0 auto 15px auto; }
+        .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 500px; margin: 0 auto 15px auto; cursor: pointer; }
         .dash-item { background: var(--bg-card); padding: 10px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; }
         .dash-item small { font-size: 10px; text-transform: uppercase; color: var(--gray); display: block; }
         .dash-item b { font-size: 16px; color: var(--text-main); }
+
+        /* NOVO: ESTILO DASHBOARD ESTATÍSTICO */
+        .stats-container { background: var(--bg-card); padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center; }
+        .bar-chart { display: flex; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; background: #eee; }
+        .bar-segment { height: 100%; transition: width 0.5s; }
 
         .cadastro-container { max-width: 500px; margin: 0 auto 20px auto; background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .grid-form { display: flex; flex-direction: column; gap: 10px; }
@@ -96,6 +101,8 @@
         .fa-trash { color: var(--danger); }
         .fa-undo { color: var(--success); }
         .fa-whatsapp { color: #25d366; }
+        .fa-copy { color: var(--warning); }
+        .fa-history { color: var(--dark); }
 
         .btn-enviar-form { width: 100%; background: var(--success); color: white; border: none; padding: 8px; border-radius: 5px; font-weight: bold; margin-top: 5px; cursor: pointer; font-size: 12px; }
         .btn-pendente { width: 100%; background: var(--warning); color: #000; border: none; padding: 8px; border-radius: 5px; font-weight: bold; margin-top: 10px; cursor: pointer; font-size: 12px; }
@@ -119,6 +126,9 @@
         /* OPÇÃO 3: TEMPLATES WHATSAPP STYLES */
         .config-section { max-width: 500px; margin: 20px auto; background: var(--bg-card); padding: 15px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .config-section textarea { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; background: var(--bg-body); color: var(--text-main); font-size: 12px; height: 60px; }
+
+        /* HISTORICO LIST STYLE */
+        .hist-item { font-size: 10px; border-bottom: 1px solid #eee; padding: 5px 0; color: var(--gray); }
 
         @media (min-width: 600px) {
             .nav-buttons { grid-template-columns: 1fr 1fr 1fr; max-width: 900px; }
@@ -155,7 +165,19 @@
             <button class="btn-theme" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
         </div>
 
-        <div class="dashboard">
+        <div class="stats-container" id="stats-area" style="max-width: 500px; margin: 0 auto 10px auto;">
+            <small style="color: var(--gray); font-weight: bold;">SAÚDE DO SISTEMA</small>
+            <div class="bar-chart">
+                <div id="bar-ativos" class="bar-segment" style="background: var(--primary); width: 0%;"></div>
+                <div id="bar-vencendo" class="bar-segment" style="background: var(--danger); width: 0%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold;">
+                <span style="color: var(--primary);">Ativos: <span id="perc-ativos">0</span>%</span>
+                <span style="color: var(--danger);">Vencendo: <span id="perc-vencendo">0</span>%</span>
+            </div>
+        </div>
+
+        <div class="dashboard" onclick="renderizar()">
             <div class="dash-item"><small>Ativos</small><b id="count-ativos">0</b></div>
             <div class="dash-item"><small>Vencendo</small><b id="count-fim">0</b></div>
             <div class="dash-item"><small>Total</small><b id="count-total">0</b></div>
@@ -226,6 +248,11 @@
             <div class="search-container"><input type="text" class="search-input" placeholder="🔍 Buscar na lixeira..." onkeyup="filtrarCards(this, 'grid-excluidos')"></div>
             <div id="grid-excluidos" class="grid-cards"></div>
         </div>
+
+        <div id="modal-historico" class="modal">
+            <div class="modal-header"><h3>Histórico de Renovação</h3> <button class="btn-fechar" onclick="fecharModais()">Sair</button></div>
+            <div id="lista-historico" style="background: var(--bg-card); padding: 15px; border-radius: 12px;"></div>
+        </div>
     </div>
 
     <script>
@@ -235,6 +262,31 @@
 
         // CARREGA TEMPLATE SALVO (OPÇÃO 3)
         document.getElementById('wp_template').value = localStorage.getItem('albatroz_wp_msg') || "Olá [NOME], sua assinatura vence em breve!";
+
+        // SINCRONIZANDO COM INDEXEDDB PARA SEGURANÇA (OPÇÃO 4)
+        const dbRequest = indexedDB.open("AlbatrozDB", 1);
+        dbRequest.onupgradeneeded = (e) => { e.target.result.createObjectStore("clientes", { keyPath: "id" }); };
+        dbRequest.onsuccess = (e) => {
+             const db = e.target.result;
+             const transaction = db.transaction("clientes", "readonly");
+             const store = transaction.objectStore("clientes");
+             store.getAll().onsuccess = (ev) => {
+                 if(ev.target.result.length > clientes.length) {
+                     clientes = ev.target.result;
+                     renderizar();
+                 }
+             };
+        };
+
+        function salvarDBInterno(dados) {
+            const dbRequest = indexedDB.open("AlbatrozDB", 1);
+            dbRequest.onsuccess = (e) => {
+                const db = e.target.result;
+                const transaction = db.transaction("clientes", "readwrite");
+                const store = transaction.objectStore("clientes");
+                store.put(dados);
+            };
+        }
 
         // Atualização contínua do cronômetro mesmo com site fechado
         setInterval(renderizar, 60000);
@@ -326,6 +378,8 @@
             
             if (!nomeVal || !validadeVal) return alert("Preencha Nome e Validade.");
             
+            const expiraTime = new Date(validadeVal).getTime();
+            
             const dados = {
                 nome: nomeVal,
                 email: emailVal,
@@ -333,10 +387,11 @@
                 cpf: cpfVal,
                 id_acesso: id_acessoVal,
                 senha_acesso: senha_acessoVal,
-                expira: new Date(validadeVal).getTime(),
+                expira: expiraTime,
                 foto: fotoVal,
                 id_planilha: idPlanilhaVal,
-                status: 'ativo'
+                status: 'ativo',
+                historico: [] // Novo campo para histórico
             };
 
             const formURL = "https://docs.google.com/forms/d/e/1FAIpQLScvNN2ww22ZPmF_WCp1pUdS3sxzgtCEpfNUHRlREF8cBAMp2g/formResponse";
@@ -357,7 +412,13 @@
 
             if (idEdicao) {
                 const idx = clientes.findIndex(c => c.id === idEdicao);
-                clientes[idx] = { ...clientes[idx], ...dados };
+                // OPÇÃO 1: GRAVAR NO HISTÓRICO SE A DATA MUDOU
+                if(clientes[idx].expira !== expiraTime) {
+                    if(!clientes[idx].historico) clientes[idx].historico = [];
+                    clientes[idx].historico.unshift(new Date().toLocaleString());
+                    if(clientes[idx].historico.length > 5) clientes[idx].historico.pop();
+                }
+                clientes[idx] = { ...clientes[idx], ...dados, historico: clientes[idx].historico };
                 idEdicao = null;
                 document.getElementById('btn-main').innerText = "FINALIZAR CADASTRO";
             } else {
@@ -384,7 +445,11 @@
             .catch(() => alert("Erro ao conectar."));
         }
 
-        function salvarEAtualizar() { localStorage.setItem('db_spook_v4', JSON.stringify(clientes)); renderizar(); }
+        function salvarEAtualizar() { 
+            localStorage.setItem('db_spook_v4', JSON.stringify(clientes)); 
+            clientes.forEach(c => salvarDBInterno(c)); // OPÇÃO 4
+            renderizar(); 
+        }
 
         // FUNÇÃO PARA CAMUFLAR INFO
         function toggleCamuflagem(id) {
@@ -424,6 +489,28 @@
             localStorage.setItem('albatroz_wp_msg', document.getElementById('wp_template').value);
         }
 
+        // OPÇÃO 3: COPIAR ACESSO (Clipboard)
+        function copiarAcesso(id) {
+            const c = clientes.find(cli => cli.id === id);
+            const texto = `*Dados de Acesso Albatroz:*\n👤 Nome: ${c.nome}\n🔑 ID: ${c.id_acesso || '---'}\n🔒 Senha: ${c.senha_acesso || '---'}\n📅 Vence em: ${new Date(c.expira).toLocaleDateString()}`;
+            navigator.clipboard.writeText(texto).then(() => alert("Dados copiados!"));
+        }
+
+        // OPÇÃO 1: VER HISTÓRICO
+        function verHistorico(id) {
+            const c = clientes.find(cli => cli.id === id);
+            const lista = document.getElementById('lista-historico');
+            lista.innerHTML = `<h4>${c.nome}</h4>`;
+            if(!c.historico || c.historico.length === 0) {
+                lista.innerHTML += `<p style="font-size:12px;">Sem histórico de renovação.</p>`;
+            } else {
+                c.historico.forEach(h => {
+                    lista.innerHTML += `<div class="hist-item"><i class="fas fa-check-circle"></i> Renovado em: ${h}</div>`;
+                });
+            }
+            abrirModal('modal-historico');
+        }
+
         function renderizar() {
             const tA = document.getElementById('grid-ativos');
             const tV = document.getElementById('grid-fim');
@@ -446,6 +533,8 @@
                     <div class="card-acoes">
                         ${p !== 'excluido' ? 
                             `<i class="fas fa-eye" onclick="toggleCamuflagem(${c.id})"></i>
+                             <i class="fas fa-copy" onclick="copiarAcesso(${c.id})"></i>
+                             <i class="fas fa-history" onclick="verHistorico(${c.id})"></i>
                              <i class="fab fa-whatsapp" onclick="enviarZap('${c.contato}', '${c.nome}')"></i>
                              <i class="fas fa-pencil-alt" onclick="editar(${c.id})"></i>
                              <i class="fas fa-trash" onclick="mudarStatus(${c.id}, 'excluido')"></i>` :
@@ -473,10 +562,22 @@
                 else if(p === 'vencendo') tV.appendChild(card); 
                 else tL.appendChild(card);
             });
+            
+            // ATUALIZA CONTAGENS
             document.getElementById('count-ativos').innerText = cA;
             document.getElementById('count-fim').innerText = cV;
             document.getElementById('count-total').innerText = clientes.length;
             document.getElementById('btn-fim').classList.toggle('alerta-vencendo', cV > 0);
+
+            // OPÇÃO 2: ATUALIZA DASHBOARD VISUAL (HEALTH CHECK)
+            const totalVisivel = cA + cV;
+            const pAtivos = totalVisivel > 0 ? Math.round((cA / totalVisivel) * 100) : 0;
+            const pVencendo = totalVisivel > 0 ? Math.round((cV / totalVisivel) * 100) : 0;
+            
+            document.getElementById('bar-ativos').style.width = pAtivos + "%";
+            document.getElementById('bar-vencendo').style.width = pVencendo + "%";
+            document.getElementById('perc-ativos').innerText = pAtivos;
+            document.getElementById('perc-vencendo').innerText = pVencendo;
         }
 
         function calcCronometro(ms) {
