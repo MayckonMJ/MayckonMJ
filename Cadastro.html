@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro - ALBATROZ</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         :root {
             --primary: #007bff;
@@ -53,6 +54,7 @@
 
         .form-group {
             margin-bottom: 15px;
+            position: relative;
         }
 
         label {
@@ -78,6 +80,22 @@
             border-color: var(--primary);
         }
 
+        /* Estilos para o Olhinho e Feedback */
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 38px;
+            cursor: pointer;
+            color: #777;
+        }
+
+        .feedback-icon {
+            position: absolute;
+            right: 15px;
+            top: 38px;
+            display: none;
+        }
+
         .btn-enviar {
             width: 100%;
             padding: 15px;
@@ -90,10 +108,19 @@
             cursor: pointer;
             margin-top: 10px;
             transition: background 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-enviar:disabled {
+            background: #ccc;
+            cursor: not-allowed;
         }
 
         /* Modal Styles */
-        #modal-status {
+        #modal-status, #modal-termos {
             display: none;
             position: fixed;
             top: 0;
@@ -113,6 +140,19 @@
             text-align: center;
             max-width: 300px;
             width: 80%;
+        }
+
+        /* Estilo do Modal de Termos */
+        .modal-termos-content {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            text-align: left;
+            position: relative;
         }
 
         .loader {
@@ -162,6 +202,27 @@
             text-align: left;
             font-size: 13px;
         }
+
+        /* Estilo para piscar em vermelho */
+        @keyframes blink-red {
+            0% { border-color: #eee; }
+            50% { border-color: var(--danger); box-shadow: 0 0 10px rgba(231, 76, 60, 0.5); }
+            100% { border-color: #eee; }
+        }
+        .input-error-blink {
+            animation: blink-red 0.8s infinite;
+        }
+
+        .lgpd-box {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .lgpd-box input { width: auto; margin-top: 3px; }
+        .link-termos { color: var(--primary); text-decoration: underline; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -196,17 +257,25 @@
                 </div>
 
                 <div class="form-group">
-                    <label>Digite seu E-mail sem o:  @</label>
-                    <p style="color: blue; font-size: 10px;">Para acessar o seu<strong style="color: red;"> Historico de Venda</strong>, use o seu e-mail (Sem o @) como ID.</p>
-                    <input type="text" id="id_acesso" placeholder="Digite seu E-mail Sem o: @" required>
+                    <label>Confirmar E-mail</label>
+                    <input type="text" id="id_acesso" placeholder="Digite seu E-mail" required>
+                    <i id="check-email" class="fas fa-check-circle feedback-icon" style="color: var(--success);"></i>
                 </div>
 
                 <div class="form-group">
-                    <label>Senha</label>
+                    <label>Criar uma Senha</label>
                     <input type="password" id="senha" placeholder="Digite sua senha" required>
+                    <i class="fas fa-eye toggle-password" id="toggleSenha"></i>
                 </div>
 
-                <button type="submit" class="btn-enviar" id="btn-submit">REALIZAR CADASTRO</button>
+                <div class="lgpd-box">
+                    <input type="checkbox" id="termos" required>
+                    <label for="termos">Li e concordo com a <span class="link-termos" onclick="abrirTermos()">Política de Privacidade</span> e o processamento dos meus dados.</label>
+                </div>
+
+                <button type="submit" class="btn-enviar" id="btn-submit">
+                    <span id="btn-text">REALIZAR CADASTRO</span>
+                </button>
             </form>
         </div>
 
@@ -217,13 +286,31 @@
             <p style="color: red; font-size: 14px;">O acesso ao sistema foi liberado. por favor, utilize as credenciais abaixo para entrar.</p>
             
             <div id="dados-copia" class="resumo-dados">
-                <strong>Seus Dados para Cópia:</strong><br>
-                <div id="lista-resumo"></div>
-                <button onclick="copiarDados()" style="margin-top:10px; width:100%; padding:5px; cursor:pointer;">Copiar Dados</button>
+                <div id="pdf-content">
+                    <strong>Seus Dados para Cópia:</strong><br>
+                    <div id="lista-resumo"></div>
+                </div>
+                <button onclick="copiarDados()" style="margin-top:10px; width:100%; padding:8px; cursor:pointer; background: #eee; border: 1px solid #ccc; border-radius: 5px;">Copiar Dados</button>
+                <button onclick="gerarPDF()" style="margin-top:5px; width:100%; padding:8px; cursor:pointer; background: var(--primary); color: white; border: none; border-radius: 5px;">Salvar em PDF</button>
             </div>
           <a href="https://wa.me/5562995679219?text=Olá,%20eu%20acabei%20de%20efetuar%20meu%20cadastro." target="_blank" style="display: inline-block; padding: 10px 20px; margin: 10px; background-color: #25D366; color: white; text-decoration: none; border-radius: 5px; font-family: sans-serif;">
     Suporte
 </a>
+        </div>
+    </div>
+
+    <div id="modal-termos">
+        <div class="modal-termos-content">
+            <h3 style="margin-top: 0;">Política de Privacidade - ALBATROZ</h3>
+            <p style="font-size: 13px; color: #444;">
+                Ao utilizar este formulário, você concorda com a coleta e o processamento dos seguintes dados:<br><br>
+                <strong>1. Dados Coletados:</strong> Nome completo, CPF, WhatsApp, E-mail e Senha de acesso.<br><br>
+                <strong>2. Finalidade:</strong> Os dados são coletados exclusivamente para a criação da sua conta no sistema Albatroz e para que nossa equipe de suporte possa entrar em contato para liberação de acesso.<br><br>
+                <strong>3. Segurança:</strong> Suas informações são transmitidas de forma segura e armazenadas apenas para uso interno de controle de acesso.<br><br>
+                <strong>4. Direitos:</strong> Você pode solicitar a alteração ou exclusão dos seus dados a qualquer momento entrando em contato com o suporte oficial via WhatsApp.<br><br>
+                <strong>5. Responsabilidade:</strong> Você é responsável pela veracidade dos dados informados e pelo sigilo da sua senha de acesso.
+            </p>
+            <button onclick="fecharTermos()" style="width: 100%; padding: 10px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">ENTENDI E FECHAR</button>
         </div>
     </div>
 
@@ -235,12 +322,16 @@
             </div>
             <div id="success-box" style="display: none;">
                 <i class="fas fa-check-circle success-icon" style="display: block;"></i>
-                <div class="status-text">Seu cadastro foi feito com sucesso, em breve o suporte irá entrar em contato para liberar seu acesso.</div>
+                <div class="status-text">Seu cadastro foi feito com sucesso, em breve o suporte irá entrar em contato para liberar seu acesso definitivamente.</div>
             </div>
         </div>
     </div>
 
     <script>
+        // Funções para o Modal de Termos
+        function abrirTermos() { document.getElementById('modal-termos').style.display = 'flex'; }
+        function fecharTermos() { document.getElementById('modal-termos').style.display = 'none'; }
+
         // Verificar se já existe cadastro ao carregar a página
         window.onload = function() {
             if (localStorage.getItem('spook_ice_cadastrado') === 'true') {
@@ -249,6 +340,24 @@
                 mostrarResumoSalvo();
             }
         };
+
+        // Função para Validar CPF (Matemática Real)
+        function validarCPF(cpf) {
+            cpf = cpf.replace(/[^\d]+/g,'');
+            if(cpf == '') return false;
+            if (cpf.length != 11 || cpf == "00000000000" || cpf == "11111111111" || cpf == "22222222222" || cpf == "33333333333" || cpf == "44444444444" || cpf == "55555555555" || cpf == "66666666666" || cpf == "77777777777" || cpf == "88888888888" || cpf == "99999999999") return false;
+            add = 0;
+            for (i=0; i < 9; i ++) add += parseInt(cpf.charAt(i)) * (10 - i);
+            rev = 11 - (add % 11);
+            if (rev == 10 || rev == 11) rev = 0;
+            if (rev != parseInt(cpf.charAt(9))) return false;
+            add = 0;
+            for (i = 0; i < 10; i ++) add += parseInt(cpf.charAt(i)) * (11 - i);
+            rev = 11 - (add % 11);
+            if (rev == 10 || rev == 11) rev = 0;
+            if (rev != parseInt(cpf.charAt(10))) return false;
+            return true;
+        }
 
         // Máscara de CPF
         document.getElementById('cpf').addEventListener('input', e => {
@@ -262,22 +371,64 @@
             e.target.value = !x[2] ? x[1] : '(' + x[1] + ') ' + x[2] + (x[3] ? '-' + x[3] : '');
         });
 
+        // Olhinho da Senha
+        document.getElementById('toggleSenha').addEventListener('click', function() {
+            const senhaInput = document.getElementById('senha');
+            const type = senhaInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            senhaInput.setAttribute('type', type);
+            this.classList.toggle('fa-eye-slash');
+        });
+
+        // --- Lógica para piscar o campo e Feedback Visual ---
+        const emailInput = document.getElementById('email');
+        const confirmEmailInput = document.getElementById('id_acesso');
+        const checkIcon = document.getElementById('check-email');
+
+        function validarEmails() {
+            if (confirmEmailInput.value !== "" && emailInput.value !== confirmEmailInput.value) {
+                confirmEmailInput.classList.add('input-error-blink');
+                checkIcon.style.display = 'none';
+            } else if (confirmEmailInput.value !== "" && emailInput.value === confirmEmailInput.value) {
+                confirmEmailInput.classList.remove('input-error-blink');
+                checkIcon.style.display = 'block';
+            } else {
+                confirmEmailInput.classList.remove('input-error-blink');
+                checkIcon.style.display = 'none';
+            }
+        }
+
+        emailInput.addEventListener('input', validarEmails);
+        confirmEmailInput.addEventListener('input', validarEmails);
+
         document.getElementById('form-cadastro').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const btnSubmit = document.getElementById('btn-submit');
+            const btnText = document.getElementById('btn-text');
             const modal = document.getElementById('modal-status');
             const loadingBox = document.getElementById('loading-box');
             const successBox = document.getElementById('success-box');
 
-            // Validação de ID diferente de Email
-            if (document.getElementById('id_acesso').value === document.getElementById('email').value) {
-                alert("O ID não pode ser igual ao E-mail!\nVocê pode usar o seu e-mail (Sem o @) por exemplo");
+            // Validação de CPF Real
+            if(!validarCPF(document.getElementById('cpf').value)) {
+                alert("Por favor, insira um CPF válido.");
                 return;
             }
 
-            modal.style.display = 'flex';
+            // --- Validação de E-mails idênticos ---
+            const emailValue = document.getElementById('email').value;
+            const confirmEmailValue = document.getElementById('id_acesso').value;
+
+            if (emailValue !== confirmEmailValue) {
+                alert("Os e-mails digitados não são idênticos! Por favor, verifique.");
+                confirmEmailInput.focus();
+                return;
+            }
+
+            // Estado de Enviando
             btnSubmit.disabled = true;
+            btnText.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PROCESSANDO...';
+            modal.style.display = 'flex';
 
             // --- Lógica para gerar ID único ---
             let idUnicoAleatorio = "";
@@ -287,7 +438,6 @@
                 const linhas = csvText.split('\n');
                 let idsExistentes = [];
                 
-                // Pega a Coluna K (índice 10)
                 for (let i = 1; i < linhas.length; i++) {
                     const colunas = linhas[i].split(',');
                     if (colunas[10]) {
@@ -304,10 +454,8 @@
                     }
                 }
             } catch (err) {
-                // Fallback caso falhe a leitura (gera um aleatório mesmo assim)
                 idUnicoAleatorio = Math.floor(100000 + Math.random() * 900000).toString();
             }
-            // ---------------------------------
 
             const formURL = "https://docs.google.com/forms/d/e/1FAIpQLScvNN2ww22ZPmF_WCp1pUdS3sxzgtCEpfNUHRlREF8cBAMp2g/formResponse";
             
@@ -315,18 +463,13 @@
             formData.append("entry.1234006123", document.getElementById('nome').value);
             formData.append("entry.656246663", document.getElementById('cpf').value);
             formData.append("entry.694404201", document.getElementById('whatsapp').value);
-            
-            // Novos Campos e Mapeamento Solicitado
-            formData.append("entry.1141684307", document.getElementById('email').value); // Coluna B
-            formData.append("entry.1324595610", document.getElementById('senha').value); // Coluna C
-            formData.append("entry.256625062", document.getElementById('senha').value);  // Coluna E
-            formData.append("entry.1689283183", document.getElementById('id_acesso').value); // Coluna H
-            
-            // Novos Entries para ID Aleatório Único
-            formData.append("entry.865836184", idUnicoAleatorio); // Coluna J
-            formData.append("entry.43896517", idUnicoAleatorio);  // Coluna K
+            formData.append("entry.1141684307", document.getElementById('email').value);
+            formData.append("entry.1324595610", document.getElementById('senha').value);
+            formData.append("entry.256625062", document.getElementById('senha').value);
+            formData.append("entry.1689283183", document.getElementById('id_acesso').value);
+            formData.append("entry.865836184", idUnicoAleatorio);
+            formData.append("entry.43896517", idUnicoAleatorio);
 
-            // Salvar dados localmente para o resumo
             const dadosResumo = {
                 nome: document.getElementById('nome').value,
                 cpf: document.getElementById('cpf').value,
@@ -344,11 +487,9 @@
                 body: formData
             }).then(() => {
                 localStorage.setItem('spook_ice_cadastrado', 'true');
-
                 setTimeout(() => {
                     loadingBox.style.display = 'none';
                     successBox.style.display = 'block';
-                    
                     setTimeout(() => {
                         modal.style.display = 'none';
                         document.getElementById('form-content').style.display = 'none';
@@ -360,6 +501,7 @@
                 alert("Erro ao enviar. Verifique sua conexão.");
                 modal.style.display = 'none';
                 btnSubmit.disabled = false;
+                btnText.innerText = 'REALIZAR CADASTRO';
             });
         });
 
@@ -370,9 +512,9 @@
                     <p><strong>Nome:</strong> ${dados.nome}</p>
                     <p><strong>CPF:</strong> ${dados.cpf}</p>
                     <p><strong>WhatsApp:</strong> ${dados.whatsapp}</p>
-                    <p><strong>Email de Acesso para entar no sistema:</strong> ${dados.email}</p>
-                    <p><strong>ID de Acesso do Historico de Venda:</strong> ${dados.id}</p>
-                    <p><strong>Senha para Ambos os Acessos:</strong> ${dados.senha}</p>
+                    <p><strong>Email de Acesso:</strong> ${dados.email}</p>
+                    <p><strong>ID de Acesso:</strong> ${dados.id}</p>
+                    <p><strong>Senha:</strong> ${dados.senha}</p>
                     <p><strong>Protocolo:</strong> ${dados.id_unico || ''}</p>
                 `;
             }
@@ -384,6 +526,18 @@
             navigator.clipboard.writeText(texto).then(() => {
                 alert("Dados copiados para a área de transferência!");
             });
+        }
+
+        function gerarPDF() {
+            const element = document.getElementById('pdf-content');
+            const opt = {
+                margin: 1,
+                filename: 'Comprovante_Albatroz.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
         }
     </script>
 
